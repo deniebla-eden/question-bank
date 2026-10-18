@@ -355,7 +355,7 @@ button.secondary {
 <body>
 <header>
   <h1>高中題庫管理系統</h1>
-  <p>從 Google 試算表讀取題目，快速組卷與列印</p>
+  <p>快速組卷與列印</p>
 </header>
 
 <main>
@@ -599,10 +599,13 @@ function renderPaper() {
         document.getElementById("points").value || "0";
 
       const answer = answersVisible
-        ? `<div class="answer">答案：${escapeHTML(q["答案"] || "未填寫")}</div>
-           ${q["解析"] ? `<div class="explanation">解析：${escapeHTML(q["解析"])}</div>` : ""}`
+        ? `<div class="answer">
+         【答案】<br>${escapeHTML(q["答案"] || "未填寫")}<br><br>
+         【編號】<br>${escapeHTML(q["題號"] || "未填寫")}<br><br>
+         【詳解】<br>${escapeHTML(q["解析"] || "暫無詳解")}
+          </div>`
         : "";
-
+      
       return `<article class="question">
         <div class="q-title">${i + 1}. ${escapeHTML(q["題目"])}
           （${escapeHTML(point)} 分）</div>
