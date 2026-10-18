@@ -369,19 +369,81 @@ footer {
 }
 
 @media print {
-  body { background: white; color: black; }
-  
-  header, .tabs, #setupPanel, #gamePanel, footer,
-  .no-print, #statusMessage, #practiceSection > .panel {
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* 隱藏網站操作介面 */
+  header,
+  .tabs,
+  #setupPanel,
+  #gamePanel,
+  footer,
+  .no-print,
+  #statusMessage,
+  #practiceSection > .panel:first-child {
     display: none !important;
   }
-  main { width: 100%; margin: 0; }
-  #examPanel { border: 0; box-shadow: none; padding: 0; }
-  .question-card { border: 0; border-bottom: 1px solid #ccc; border-radius: 0; }
-  .answer { background: white; border: 1px solid #ccc; }
-  body.print-answers .answer { display: block !important; }
-  body.print-exam .answer { display: none !important; }
-  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+  /* 保留考卷區域 */
+  main {
+    width: 100%;
+    margin: 0;
+  }
+
+  #practiceSection,
+  #examPanel,
+  #examList {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  #examPanel {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* 隱藏考卷標題（如果不需要） */
+  #examTitle {
+    display: none !important;
+  }
+
+  /* 題目排版 */
+  .question-card {
+    display: block !important;
+    border: none;
+    border-bottom: 1px solid #ccc;
+    border-radius: 0;
+    box-shadow: none;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .question-title,
+  .option-text {
+    color: black;
+  }
+
+  /* 列印考卷時不顯示答案 */
+  body.print-exam .answer {
+    display: none !important;
+  }
+
+  /* 列印答案卷時顯示答案 */
+  body.print-answers .answer {
+    display: block !important;
+    background: white;
+    border: 1px solid #ccc;
+    color: black;
+  }
+
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
 </style>
 </head>
