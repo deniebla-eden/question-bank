@@ -1,0 +1,408 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高中題庫管理系統</title>
+<style>
+:root {
+  --main: #315c91;
+  --bg: #f3f6fb;
+  --card: #ffffff;
+  --text: #243247;
+  --muted: #64748b;
+  --line: #dce4ef;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Noto Sans TC", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  background: var(--main);
+  color: white;
+  padding: 26px 20px;
+}
+header h1 { margin: 0 0 8px; font-size: 25px; }
+header p { margin: 0; opacity: .9; }
+main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+.card {
+  background: var(--card);
+  padding: 22px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+  box-shadow: 0 3px 14px #203c6010;
+}
+h2 { font-size: 19px; margin: 0 0 16px; }
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+label { display: block; font-size: 14px; margin-bottom: 6px; }
+select, input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-size: 15px;
+}
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  background: var(--main);
+  color: white;
+}
+button.secondary { background: #e8eef7; color: #29476e; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.status { color: var(--muted); font-size: 14px; margin-top: 12px; }
+.question {
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  break-inside: avoid;
+}
+.question:last-child { border-bottom: 0; }
+.q-title { font-weight: 600; margin-bottom: 10px; line-height: 1.8; }
+.option { margin: 7px 0 7px 18px; line-height: 1.7; }
+.answer { color: #176a4a; margin-top: 10px; }
+.explanation { color: var(--muted); margin-top: 6px; font-size: 14px; }
+#paperTitle { margin-bottom: 8px; }
+.small { font-size: 13px; color: var(--muted); }
+@media print {
+  body { background: white; color: black; }
+  header, #settings, #toolbar, .no-print { display: none !important; }
+  main { max-width: none; margin: 0; padding: 0; }
+  .card { box-shadow: none; padding: 0; margin: 0; }
+  #paper { display: block !important; }
+  .question { padding: 12px 0; }
+  .answer { color: black; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>高中題庫管理系統</h1>
+  <p>從 Google 試算表讀取題目，快速組卷與列印</p>
+</header>
+
+<main>
+  <section class="card" id="settings">
+    <h2>📚 題庫與篩選</h2>
+    <div class="filters">
+      <div>
+        <label for="subject">科目</label>
+        <select id="subject"><option value="">全部科目</option></select>
+      </div>
+      <div>
+        <label for="chapter">章節</label>
+        <select id="chapter"><option value="">全部章節</option></select>
+      </div>
+      <div>
+        <label for="type">題型</label>
+        <select id="type"><option value="">全部題型</option></select>
+      </div>
+      <div>
+        <label for="difficulty">難度</label>
+        <select id="difficulty"><option value="">全部難度</option></select>
+      </div>
+      <div>
+        <label for="count">抽題數量</label>
+        <input id="count" type="number" min="1" value="10">
+      </div>
+      <div>
+        <label for="titleInput">試卷標題</label>
+        <input id="titleInput" value="高中練習試卷">
+      </div>
+      <div>
+        <label for="points">每題預設配分</label>
+        <input id="points" type="number" min="0" value="2">
+      </div>
+    </div>
+    <div class="actions">
+      <button id="loadBtn" onclick="loadQuestions()">重新讀取題庫</button>
+      <button onclick="makePaper()">🎲 隨機組卷</button>
+    </div>
+    <div class="status" id="status">正在準備讀取題庫……</div>
+  </section>
+
+  <section class="card" id="toolbar">
+    <h2>📝 試卷預覽</h2>
+    <div class="actions">
+      <button onclick="printPaper(false)">列印試卷／另存 PDF</button>
+      <button class="secondary" onclick="printPaper(true)">列印答案卷／另存 PDF</button>
+      <button class="secondary" onclick="showAnswers()">顯示／隱藏答案</button>
+    </div>
+    <p class="small">列印時可在瀏覽器的目的地選擇「另存為 PDF」。</p>
+  </section>
+
+  <section class="card" id="paper">
+    <h2 id="paperTitle">高中練習試卷</h2>
+    <div id="paperInfo" class="small"></div>
+    <div id="questions">
+      尚未組卷。請先讀取題庫，再按「隨機組卷」。
+    </div>
+  </section>
+</main>
+
+<script>
+const CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9PKH0Ygpd73cQDqx0RrFgQLmkY_X6GEDE__0PpGgWRyEHDb6SDns8D_EM1D319sr2BwuyZGvJZST_/pub?gid=0&single=true&output=csv";
+
+let allQuestions = [];
+let paperQuestions = [];
+let answersVisible = false;
+let printAnswersOnly = false;
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  text = text.replace(/^\uFEFF/, "");
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+
+    if (c === '"') {
+      if (quoted && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (c === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((c === "\n" || c === "\r") && !quoted) {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell);
+      if (row.some(v => v.trim() !== "")) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += c;
+    }
+  }
+
+  if (cell.length || row.length) {
+    row.push(cell);
+    if (row.some(v => v.trim() !== "")) rows.push(row);
+  }
+
+  if (!rows.length) return [];
+
+  const headers = rows.shift().map(h => h.trim());
+  return rows.map(values => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (values[i] || "").trim());
+    return obj;
+  });
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+async function loadQuestions() {
+  const status = document.getElementById("status");
+  const btn = document.getElementById("loadBtn");
+  status.textContent = "正在連線讀取 Google 試算表……";
+  btn.disabled = true;
+
+  try {
+    const response = await fetch(CSV_URL);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
+    const text = await response.text();
+    if (text.trim().startsWith("<")) {
+      throw new Error("收到的不是 CSV，請確認試算表已發布為 CSV。");
+    }
+
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error("表格沒有題目資料。");
+
+    allQuestions = rows.filter(q => q["題目"]);
+
+    if (!allQuestions.length) {
+      throw new Error("找不到「題目」欄，請確認第一列欄位名稱。");
+    }
+
+    ["subject", "chapter", "type", "difficulty"].forEach(id => {
+      const key = {
+        subject: "科目",
+        chapter: "章節",
+        type: "題型",
+        difficulty: "難度"
+      }[id];
+
+      const select = document.getElementById(id);
+      const previous = select.value;
+      const label = {
+        subject: "全部科目",
+        chapter: "全部章節",
+        type: "全部題型",
+        difficulty: "全部難度"
+      }[id];
+
+      const values = [...new Set(
+        allQuestions.map(q => q[key]).filter(Boolean)
+      )].sort();
+
+      select.innerHTML =
+        `<option value="">${label}</option>` +
+        values.map(v =>
+          `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`
+        ).join("");
+
+      if (values.includes(previous)) select.value = previous;
+    });
+
+    status.textContent = `讀取成功，共 ${allQuestions.length} 題。`;
+  } catch (err) {
+    status.textContent =
+      "讀取失敗：" + err.message +
+      "。請確認 CSV 公開權限、欄位名稱及網路連線。";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function filteredQuestions() {
+  return allQuestions.filter(q =>
+    (!document.getElementById("subject").value ||
+      q["科目"] === document.getElementById("subject").value) &&
+    (!document.getElementById("chapter").value ||
+      q["章節"] === document.getElementById("chapter").value) &&
+    (!document.getElementById("type").value ||
+      q["題型"] === document.getElementById("type").value) &&
+    (!document.getElementById("difficulty").value ||
+      q["難度"] === document.getElementById("difficulty").value)
+  );
+}
+
+function makePaper() {
+  const pool = filteredQuestions();
+  const count = Math.max(1, Number(document.getElementById("count").value) || 1);
+
+  if (!pool.length) {
+    alert("目前篩選條件下沒有題目，請調整條件。");
+    return;
+  }
+
+  paperQuestions = [...pool]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.min(count, pool.length));
+
+  answersVisible = false;
+  renderPaper();
+  document.getElementById("status").textContent =
+    `符合條件 ${pool.length} 題，已抽出 ${paperQuestions.length} 題。`;
+}
+
+function renderPaper() {
+  const title = document.getElementById("titleInput").value.trim()
+    || "高中練習試卷";
+  document.getElementById("paperTitle").textContent = title;
+
+  const total = paperQuestions.reduce((sum, q) => {
+    const p = Number(q["配分"]);
+    return sum + (q["配分"] && Number.isFinite(p)
+      ? p : Number(document.getElementById("points").value) || 0);
+  }, 0);
+
+  document.getElementById("paperInfo").textContent =
+    `共 ${paperQuestions.length} 題｜總配分 ${total} 分`;
+
+  document.getElementById("questions").innerHTML =
+    paperQuestions.map((q, i) => {
+      const options = ["A", "B", "C", "D"]
+        .filter(k => q["選項" + k])
+        .map(k =>
+          `<div class="option">${k}. ${escapeHTML(q["選項" + k])}</div>`
+        ).join("");
+
+      const point = q["配分"] ||
+        document.getElementById("points").value || "0";
+
+      const answer = answersVisible
+        ? `<div class="answer">答案：${escapeHTML(q["答案"] || "未填寫")}</div>
+           ${q["解析"] ? `<div class="explanation">解析：${escapeHTML(q["解析"])}</div>` : ""}`
+        : "";
+
+      return `<article class="question">
+        <div class="q-title">${i + 1}. ${escapeHTML(q["題目"])}
+          （${escapeHTML(point)} 分）</div>
+        ${options}
+        ${answer}
+      </article>`;
+    }).join("");
+}
+
+function showAnswers() {
+  if (!paperQuestions.length) {
+    alert("請先組卷。");
+    return;
+  }
+  answersVisible = !answersVisible;
+  renderPaper();
+}
+
+function printPaper(answerOnly) {
+  if (!paperQuestions.length) {
+    alert("請先組卷。");
+    return;
+  }
+
+  printAnswersOnly = answerOnly;
+  const questions = document.getElementById("questions");
+  const original = questions.innerHTML;
+
+  if (answerOnly) {
+    questions.innerHTML = paperQuestions.map((q, i) =>
+      `<article class="question">
+        <div class="q-title">${i + 1}. ${escapeHTML(q["題目"])}</div>
+        <div class="answer">答案：${escapeHTML(q["答案"] || "未填寫")}</div>
+        ${q["解析"] ? `<div class="explanation">解析：${escapeHTML(q["解析"])}</div>` : ""}
+      </article>`
+    ).join("");
+    document.getElementById("paperTitle").textContent =
+      (document.getElementById("titleInput").value || "高中練習試卷") + "－答案卷";
+  }
+
+  window.onafterprint = () => {
+    questions.innerHTML = original;
+    document.getElementById("paperTitle").textContent =
+      document.getElementById("titleInput").value || "高中練習試卷";
+    window.onafterprint = null;
+  };
+
+  window.print();
+
+  if (answerOnly) {
+    questions.innerHTML = original;
+    document.getElementById("paperTitle").textContent =
+      document.getElementById("titleInput").value || "高中練習試卷";
+  }
+}
+
+["subject", "chapter", "type", "difficulty"].forEach(id => {
+  document.getElementById(id).addEventListener("change", () => {
+    const pool = filteredQuestions();
+    document.getElementById("status").textContent =
+      `目前符合條件 ${pool.length} 題。`;
+  });
+});
+
+loadQuestions();
+</script>
+</body>
+</html>
