@@ -371,7 +371,9 @@ footer {
 @media print {
   body { background: white; color: black; }
   header, .tabs, #setupPanel, #gamePanel, footer,
-  .no-print, #statusMessage { display: none !important; }
+  .no-print, #statusMessage, #practiceSection > .panel {
+    display: none !important;
+  }
   main { width: 100%; margin: 0; }
   #examPanel { border: 0; box-shadow: none; padding: 0; }
   .question-card { border: 0; border-bottom: 1px solid #ccc; border-radius: 0; }
