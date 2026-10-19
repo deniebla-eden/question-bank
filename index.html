@@ -4,6 +4,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" href="./icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="智慧題庫">
+<meta name="theme-color" content="#6978f4">
 <title>高中智慧題庫</title>
 
 <style>
@@ -412,14 +416,45 @@ footer {
   }
 
   /* 題目排版 */
-  .question-card {
+ .question-card {
     display: block !important;
     border: none;
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid #ddd;
     border-radius: 0;
     box-shadow: none;
-    page-break-inside: avoid;
-    break-inside: avoid;
+
+  /* 不再強制整題留在同一頁 */
+    page-break-inside: auto;
+    break-inside: auto;
+
+  /* 減少每題的空白 */
+    padding: 8px 4px;
+    margin: 0;
+    }
+
+.question-meta {
+  gap: 4px;
+  margin-bottom: 5px;
+  }
+
+.question-title {
+  font-size: 11pt;
+  line-height: 1.5;
+  margin: 4px 0;
+  }
+
+.option-text {
+  font-size: 10pt;
+  line-height: 1.4;
+  margin: 3px 0;
+  }  
+
+.answer {
+  margin-top: 6px;
+  padding: 8px 10px;
+  line-height: 1.5;
+  font-size: 10pt;
+  border-radius: 4px;
   }
 
   .question-title,
