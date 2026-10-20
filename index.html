@@ -995,28 +995,23 @@ function printExam(withAnswers) {
     return;
   }
 
-  // 記住目前畫面的狀態
   const previousVisibility = answersVisible;
 
-  // 設定列印模式
   document.body.classList.remove("print-exam", "print-answers");
   document.body.classList.add(
     withAnswers ? "print-answers" : "print-exam"
   );
 
-  // 自動切換列印時的答案顯示狀態
   answersVisible = withAnswers;
   renderExam();
 
-  // 等瀏覽器完成排版後再開啟列印視窗
-  requestAnimationFrame(() => {
-    window.print();
+  // 直接由使用者點擊觸發列印
+  window.print();
 
-    // 列印視窗關閉後，恢復原本畫面
-    document.body.classList.remove("print-exam", "print-answers");
-    answersVisible = previousVisibility;
-    renderExam();
-  });
+  // 列印完成或取消後恢復原本狀態
+  document.body.classList.remove("print-exam", "print-answers");
+  answersVisible = previousVisibility;
+  renderExam();
 }
 
 // 分頁切換
