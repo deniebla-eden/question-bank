@@ -248,6 +248,59 @@ h3 { margin: 0 0 12px; font-size: 17px; }
   color: var(--muted);
 }
 
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.auth-input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  color: var(--text);
+}
+
+.auth-input:focus {
+  outline: 2px solid #aab2ff;
+  outline-offset: 1px;
+}
+
+#wrongBookList,
+#historyList {
+  margin-top: 15px;
+}
+
+.record-item {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 13px;
+  margin-top: 9px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.record-item strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.record-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .auth-grid {
+    grid-template-columns: 1fr;
+  }
+}
+  
 .hidden { display: none !important; }
 
 .status {
@@ -493,6 +546,83 @@ footer {
 </header>
 
 <main>
+  <section id="accountPanel" class="panel no-print">
+  <h2>🔐 帳號與雲端學習進度</h2>
+  <p class="description">
+    登入後即可同步 XP、作答紀錄、錯題本及各科統計。
+  </p>
+
+  <div id="authLoggedOut">
+    <div class="auth-grid">
+      <input id="authEmail" class="auth-input"
+        type="email" autocomplete="email"
+        placeholder="電子郵件">
+
+      <input id="authPassword" class="auth-input"
+        type="password" autocomplete="current-password"
+        placeholder="密碼（至少 6 個字元）">
+    </div>
+
+    <div class="button-row">
+      <button id="googleLoginBtn" class="btn btn-primary">
+        使用 Google 登入
+      </button>
+      <button id="emailLoginBtn" class="btn btn-secondary">
+        電子郵件登入
+      </button>
+      <button id="emailRegisterBtn" class="btn btn-neutral">
+        註冊新帳號
+      </button>
+      <button id="resetPasswordBtn" class="btn btn-neutral">
+        忘記密碼
+      </button>
+    </div>
+  </div>
+
+  <div id="authLoggedIn" class="hidden">
+    <p id="authUserLabel" class="description"></p>
+
+    <div class="stats">
+      <div class="stat">
+        <div id="cloudTotalXP" class="stat-number">0</div>
+        <div class="stat-label">累積 XP</div>
+      </div>
+      <div class="stat">
+        <div id="cloudAnswered" class="stat-number">0</div>
+        <div class="stat-label">累積答題數</div>
+      </div>
+      <div class="stat">
+        <div id="cloudAccuracy" class="stat-number">0%</div>
+        <div class="stat-label">整體正確率</div>
+      </div>
+    </div>
+
+    <h3>📊 各科統計</h3>
+    <div id="cloudSubjectStats" class="description">
+      尚無作答紀錄。
+    </div>
+
+    <div class="button-row">
+      <button id="toggleWrongBookBtn" class="btn btn-secondary">
+        ❌ 查看錯題本
+      </button>
+      <button id="toggleHistoryBtn" class="btn btn-secondary">
+        📚 查看作答紀錄
+      </button>
+      <button id="signOutBtn" class="btn btn-neutral">
+        登出
+      </button>
+    </div>
+
+    <div id="wrongBookList" class="hidden"></div>
+    <div id="historyList" class="hidden"></div>
+  </div>
+
+  <div id="authMessage" class="description"
+    role="status" aria-live="polite" style="margin-top:12px;">
+    登入後即可同步學習紀錄。
+  </div>
+</section>
   <div class="tabs no-print">
     <button class="tab active" data-tab="practice">📚 題庫練習</button>
     <button class="tab" data-tab="game">🎮 闖關模式</button>
@@ -679,7 +809,31 @@ footer {
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9PKH0Ygpd73cQDqx0RrFgQLmkY_X6GEDE__0PpGgWRyEHDb6SDns8D_EM1D319sr2BwuyZGvJZST_/pub?gid=0&single=true&output=csv";
+// ===== Firebase 初始化 =====
+// 請將設定值換成 Firebase 專案提供的實際內容。
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyD2sAHQVXjIgk1jB9KCOdLJ1NdWENEpOnY",
+  authDomain: "hs-chemistry-question-bank.firebaseapp.com",
+  projectId: "hs-chemistry-question-bank",
+  storageBucket: "hs-chemistry-question-bank.firebasestorage.app",
+  messagingSenderId: "306476253711",
+  appId: "1:306476253711:web:4953c9d0058a9889e4d97a",
+  measurementId: "G-5E83Z2B2DM"
+};
 
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+googleProvider.setCustomParameters({
+  prompt: "select_account"
+});
+
+let currentUser = null;
+let cloudProfile = null;
 const $ = id => document.getElementById(id);
 
 let allQuestions = [];
@@ -715,6 +869,280 @@ function escapeHTML(value) {
     '"': "&quot;",
     "'": "&#39;"
   })[char]);
+}
+  // ===== 帳號與雲端進度 =====
+
+function showAuthMessage(message, isError = false) {
+  const el = $("authMessage");
+  el.textContent = message;
+  el.style.color = isError ? "#c04450" : "";
+}
+
+function friendlyAuthError(error) {
+  const messages = {
+    "auth/invalid-email": "電子郵件格式不正確。",
+    "auth/invalid-credential": "帳號或密碼不正確。",
+    "auth/email-already-in-use": "此電子郵件已註冊。",
+    "auth/weak-password": "密碼至少需要 6 個字元。",
+    "auth/unauthorized-domain": "網站網域尚未加入 Firebase 授權網域。",
+    "auth/popup-blocked": "登入視窗遭阻擋，請允許彈出視窗後重試。",
+    "auth/popup-closed-by-user": "登入視窗已關閉。",
+    "permission-denied": "資料庫拒絕存取，請檢查 Firestore Rules。",
+    "unavailable": "雲端服務暫時無法使用，請稍後再試。"
+  };
+
+  return messages[error.code] || error.message || "操作失敗，請稍後重試。";
+}
+
+function newProfile(user) {
+  return {
+    email: user.email || "",
+    displayName: user.displayName || "",
+    totalXP: 0,
+    totalAnswered: 0,
+    totalCorrect: 0,
+    currentStreak: 0,
+    bestStreak: 0,
+    subjectStats: {},
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+}
+
+function renderCloudProfile(profile) {
+  profile = profile || newProfile(currentUser);
+
+  const answered = Number(profile.totalAnswered || 0);
+  const correct = Number(profile.totalCorrect || 0);
+
+  $("cloudTotalXP").textContent = Number(profile.totalXP || 0);
+  $("cloudAnswered").textContent = answered;
+  $("cloudAccuracy").textContent =
+    (answered ? Math.round(correct / answered * 100) : 0) + "%";
+
+  const stats = profile.subjectStats || {};
+  const subjects = Object.keys(stats);
+
+  $("cloudSubjectStats").innerHTML = subjects.length
+    ? subjects.map(subject => {
+        const item = stats[subject] || {};
+        const total = Number(item.answered || 0);
+        const right = Number(item.correct || 0);
+        const accuracy = total
+          ? Math.round(right / total * 100)
+          : 0;
+
+        return '<div class="record-item">' +
+          '<strong>' + escapeHTML(subject) + '</strong>' +
+          '<div class="record-sub">答題 ' + total +
+          ' 題 · 答對 ' + right +
+          ' 題 · 正確率 ' + accuracy + '%</div></div>';
+      }).join("")
+    : "尚無作答紀錄。";
+}
+
+async function loadCloudProfile() {
+  if (!currentUser) return;
+
+  const ref = db.collection("users").doc(currentUser.uid);
+  const snapshot = await ref.get();
+
+  if (!snapshot.exists) {
+    cloudProfile = newProfile(currentUser);
+    await ref.set(cloudProfile);
+  } else {
+    cloudProfile = snapshot.data();
+  }
+
+  renderCloudProfile(cloudProfile);
+}
+
+function getQuestionDocId(q) {
+  // Firestore 文件 ID 不可含有路徑分隔符號。
+  return encodeURIComponent(
+    String(q["題號"] || q["題目"] || "question")
+  ).slice(0, 150);
+}
+
+function serverTimestamp() {
+  return firebase.firestore.FieldValue.serverTimestamp();
+}
+
+// 每次闖關作答都保存紀錄，並更新個人統計。
+async function saveLearningRecord(q, selectedLetter, correctLetter, isCorrect, earnedXP) {
+  if (!currentUser) {
+    showAuthMessage("這次作答尚未同步。登入後的新作答才會存入雲端。");
+    return;
+  }
+
+  const userRef = db.collection("users").doc(currentUser.uid);
+  const attemptRef = userRef.collection("attempts").doc();
+  const wrongRef = userRef.collection("wrongQuestions")
+    .doc(getQuestionDocId(q));
+
+  const subject = q["科目"] || "未分類";
+  const selectedOption = q["選項" + selectedLetter] || "";
+  const correctOption = q["選項" + correctLetter] || "";
+
+  try {
+    await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(userRef);
+      const profile = snapshot.exists
+        ? snapshot.data()
+        : newProfile(currentUser);
+
+      const subjectStats = { ...(profile.subjectStats || {}) };
+      const old = subjectStats[subject] || { answered: 0, correct: 0 };
+
+      subjectStats[subject] = {
+        answered: Number(old.answered || 0) + 1,
+        correct: Number(old.correct || 0) + (isCorrect ? 1 : 0)
+      };
+
+      const streak = isCorrect
+        ? Number(profile.currentStreak || 0) + 1
+        : 0;
+
+      transaction.set(userRef, {
+        email: currentUser.email || "",
+        displayName: currentUser.displayName || "",
+        totalXP: Number(profile.totalXP || 0) + earnedXP,
+        totalAnswered: Number(profile.totalAnswered || 0) + 1,
+        totalCorrect: Number(profile.totalCorrect || 0) + (isCorrect ? 1 : 0),
+        currentStreak: streak,
+        bestStreak: Math.max(Number(profile.bestStreak || 0), streak),
+        subjectStats,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      transaction.set(attemptRef, {
+        questionId: q["題號"] || "",
+        subject,
+        chapter: q["章節"] || "",
+        question: q["題目"] || "",
+        selectedAnswer: selectedLetter,
+        selectedOption,
+        correctAnswer: correctLetter || "",
+        correctOption,
+        isCorrect,
+        earnedXP,
+        mode: "game",
+        createdAt: serverTimestamp()
+      });
+
+      if (!isCorrect) {
+        transaction.set(wrongRef, {
+          questionId: q["題號"] || "",
+          subject,
+          chapter: q["章節"] || "",
+          question: q["題目"] || "",
+          selectedAnswer: selectedLetter,
+          selectedOption,
+          correctAnswer: correctLetter || "",
+          correctOption,
+          explanation: q["解析"] || "暫無詳解",
+          wrongCount: firebase.firestore.FieldValue.increment(1),
+          lastWrongAt: serverTimestamp()
+        }, { merge: true });
+      } else {
+        transaction.delete(wrongRef);
+      }
+    });
+
+    await loadCloudProfile();
+    showAuthMessage("作答紀錄已同步至雲端。");
+  } catch (error) {
+    console.error("雲端儲存失敗：", error);
+    showAuthMessage("雲端儲存失敗：" + friendlyAuthError(error), true);
+  }
+}
+
+function displayTimestamp(value) {
+  return value && value.toDate
+    ? value.toDate().toLocaleString("zh-TW")
+    : "時間處理中";
+}
+
+async function loadWrongBook() {
+  if (!currentUser) return;
+
+  const list = $("wrongBookList");
+  list.classList.remove("hidden");
+  list.textContent = "正在載入錯題本……";
+
+  try {
+    const result = await db.collection("users")
+      .doc(currentUser.uid)
+      .collection("wrongQuestions")
+      .orderBy("lastWrongAt", "desc")
+      .get();
+
+    if (result.empty) {
+      list.innerHTML = '<div class="empty">目前沒有錯題。</div>';
+      return;
+    }
+
+    list.innerHTML = result.docs.map(doc => {
+      const q = doc.data();
+
+      return '<article class="record-item">' +
+        '<strong>' + escapeHTML(q.question || "未命名題目") + '</strong>' +
+        '<div class="record-sub">' +
+        escapeHTML(q.subject || "未分類") + ' · ' +
+        escapeHTML(q.chapter || "") + '</div>' +
+        '<p>你的答案：' + escapeHTML(q.selectedAnswer || "") + '. ' +
+        escapeHTML(q.selectedOption || "") + '</p>' +
+        '<p>正確答案：' + escapeHTML(q.correctAnswer || "") + '. ' +
+        escapeHTML(q.correctOption || "") + '</p>' +
+        '<p>詳解：' + escapeHTML(q.explanation || "暫無詳解") + '</p>' +
+        '<div class="record-sub">累計答錯 ' +
+        Number(q.wrongCount || 1) + ' 次 · 最近答錯：' +
+        escapeHTML(displayTimestamp(q.lastWrongAt)) + '</div>' +
+        '</article>';
+    }).join("");
+  } catch (error) {
+    list.textContent = "載入錯題本失敗：" + friendlyAuthError(error);
+  }
+}
+
+async function loadAttemptHistory() {
+  if (!currentUser) return;
+
+  const list = $("historyList");
+  list.classList.remove("hidden");
+  list.textContent = "正在載入作答紀錄……";
+
+  try {
+    const result = await db.collection("users")
+      .doc(currentUser.uid)
+      .collection("attempts")
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+
+    if (result.empty) {
+      list.innerHTML = '<div class="empty">尚無作答紀錄。</div>';
+      return;
+    }
+
+    list.innerHTML = result.docs.map(doc => {
+      const item = doc.data();
+
+      return '<article class="record-item">' +
+        '<strong>' + escapeHTML(item.question || "未命名題目") + '</strong>' +
+        '<div class="record-sub">' +
+        escapeHTML(item.subject || "未分類") + ' · ' +
+        escapeHTML(item.chapter || "") + ' · ' +
+        escapeHTML(displayTimestamp(item.createdAt)) + '</div>' +
+        '<p>你的答案：' + escapeHTML(item.selectedAnswer || "") + '. ' +
+        escapeHTML(item.selectedOption || "") + '</p>' +
+        '<div class="record-sub">' +
+        (item.isCorrect ? "答對" : "答錯") +
+        ' · +' + Number(item.earnedXP || 0) + ' XP</div>' +
+        '</article>';
+    }).join("");
+  } catch (error) {
+    list.textContent = "載入作答紀錄失敗：" + friendlyAuthError(error);
+  }
 }
 
 // 支援 CSV 欄位內的逗號、雙引號與換行。
@@ -1268,7 +1696,140 @@ $("backToPracticeBtn").addEventListener("click", () => {
   switchTab("practice");
 });
 
-// 初次載入
+// ===== 登入、註冊、登出 =====
+
+$("googleLoginBtn").addEventListener("click", async () => {
+  try {
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    // iPhone/iPad 優先使用重新導向，減少彈出視窗問題
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      await auth.signInWithRedirect(googleProvider);
+    } else {
+      await auth.signInWithPopup(googleProvider);
+    }
+  } catch (error) {
+    showAuthMessage(friendlyAuthError(error), true);
+  }
+});
+
+$("emailRegisterBtn").addEventListener("click", async () => {
+  const email = $("authEmail").value.trim();
+  const password = $("authPassword").value;
+
+  if (!email || !password) {
+    showAuthMessage("請填寫電子郵件及密碼。", true);
+    return;
+  }
+
+  if (password.length < 6) {
+    showAuthMessage("密碼至少需要 6 個字元。", true);
+    return;
+  }
+
+  try {
+    await auth.createUserWithEmailAndPassword(email, password);
+    showAuthMessage("註冊成功。");
+  } catch (error) {
+    showAuthMessage(friendlyAuthError(error), true);
+  }
+});
+
+$("emailLoginBtn").addEventListener("click", async () => {
+  const email = $("authEmail").value.trim();
+  const password = $("authPassword").value;
+
+  if (!email || !password) {
+    showAuthMessage("請填寫電子郵件及密碼。", true);
+    return;
+  }
+
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+    showAuthMessage("登入成功。");
+  } catch (error) {
+    showAuthMessage(friendlyAuthError(error), true);
+  }
+});
+
+$("resetPasswordBtn").addEventListener("click", async () => {
+  const email = $("authEmail").value.trim();
+
+  if (!email) {
+    showAuthMessage("請先填寫電子郵件。", true);
+    return;
+  }
+
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showAuthMessage("已寄出重設密碼郵件，請檢查信箱。");
+  } catch (error) {
+    showAuthMessage(friendlyAuthError(error), true);
+  }
+});
+
+$("signOutBtn").addEventListener("click", async () => {
+  try {
+    await auth.signOut();
+    showAuthMessage("已登出。");
+  } catch (error) {
+    showAuthMessage(friendlyAuthError(error), true);
+  }
+});
+
+$("toggleWrongBookBtn").addEventListener("click", () => {
+  const list = $("wrongBookList");
+
+  if (list.classList.contains("hidden")) {
+    loadWrongBook();
+  } else {
+    list.classList.add("hidden");
+  }
+});
+
+$("toggleHistoryBtn").addEventListener("click", () => {
+  const list = $("historyList");
+
+  if (list.classList.contains("hidden")) {
+    loadAttemptHistory();
+  } else {
+    list.classList.add("hidden");
+  }
+});
+
+// 處理 Google 重新導向登入
+auth.getRedirectResult().catch(error => {
+  showAuthMessage(friendlyAuthError(error), true);
+});
+
+// 監聽登入狀態，載入個人資料
+auth.onAuthStateChanged(async user => {
+  currentUser = user;
+  cloudProfile = null;
+
+  $("authLoggedOut").classList.toggle("hidden", !!user);
+  $("authLoggedIn").classList.toggle("hidden", !user);
+
+  if (!user) {
+    $("wrongBookList").classList.add("hidden");
+    $("historyList").classList.add("hidden");
+    showAuthMessage("登入後即可同步學習紀錄。");
+    return;
+  }
+
+  $("authUserLabel").textContent =
+    "目前登入：" + (user.displayName || user.email || "使用者");
+
+  try {
+    await loadCloudProfile();
+    showAuthMessage("登入成功，已載入雲端學習進度。");
+  } catch (error) {
+    console.error(error);
+    showAuthMessage(friendlyAuthError(error), true);
+  }
+});
+  
+  // 初次載入
 loadQuestions();
 </script>
 </body>
