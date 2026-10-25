@@ -1051,9 +1051,17 @@ async function saveLearningRecord(q, selectedLetter, correctLetter, isCorrect, e
     await loadCloudProfile();
     showAuthMessage("作答紀錄已同步至雲端。");
   } catch (error) {
-    console.error("雲端儲存失敗：", error);
-    showAuthMessage("雲端儲存失敗：" + friendlyAuthError(error), true);
-  }
+    console.error("雲端儲存失敗：", {
+  code: error.code,
+  message: error.message,
+  error: error
+});
+
+showAuthMessage(
+  "錯誤代碼：" + (error.code || "未知") +
+  "；錯誤內容：" + (error.message || "沒有提供訊息"),
+  true
+);
 }
 
 function displayTimestamp(value) {
