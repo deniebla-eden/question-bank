@@ -1587,6 +1587,7 @@ function chooseAnswer(letter) {
   const q = gameQuestions[gameIndex];
   const correctLetter = getCorrectLetter(q);
   const isCorrect = correctLetter !== "" && letter === correctLetter;
+  const previousXP = gameXPValue;
 
   $("gameOptions").querySelectorAll(".game-option").forEach(button => {
     button.disabled = true;
@@ -1626,7 +1627,15 @@ function chooseAnswer(letter) {
       '<br><br>' + escapeHTML(q["解析"] || "暫無詳解") +
       '</div>';
   }
-
+// 保存本題結果；未登入時只顯示提醒，不寫入雲端
+saveLearningRecord(
+  q,
+  letter,
+  correctLetter,
+  isCorrect,
+  gameXPValue - previousXP
+);
+  
   $("gameXP").textContent = gameXPValue;
   $("currentStreak").textContent = gameStreak;
   $("bestStreak").textContent = gameBestStreak;
